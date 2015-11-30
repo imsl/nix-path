@@ -1,0 +1,27 @@
+Name:                nix-path
+Version:             0.0.1
+Synopsis:            nix-path
+Description:
+  nix-path
+
+Author:              Rickard Nilsson
+Maintainer:          rickynils@gmail.com
+Category:            Nix
+Build-type:          Simple
+Cabal-version:       >=1.10
+
+Executable nix-path
+  Default-language: Haskell2010
+  Main-is: Main.hs
+  Ghc-options: -Wall
+  Default-extensions:
+    OverloadedStrings
+  Build-depends:
+      base  >= 4.3 && < 5
+    , containers
+    , data-fix
+    , filepath
+    , hnix
+    , split
+    , text
+    , unix
