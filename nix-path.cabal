@@ -18,10 +18,12 @@ Executable nix-path
     OverloadedStrings
   Build-depends:
       base  >= 4.3 && < 5
+    , attoparsec
+    , bytestring
     , containers
     , data-fix
     , filepath
     , hnix
-    , split
+    , hweblib
     , text
     , unix
