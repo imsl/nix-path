@@ -110,11 +110,11 @@ separated by a space character (this syntax is used also by Hydra):
 `nix-path` supports the following git revision specifiers:
 
   * `HEAD` - refers to the head of the remote
-  * `branch name` - refers to head of the specified branch
+  * `branch name` - refers to the head of the specified branch
   * `refs/xx/yy` - an exact reference
   * `SHA-1 hash` - an exact commit
 
-Sometimes, `nix-path` might interpret and intended git target as an ordinary
+Sometimes, `nix-path` might interpret an intended git target as an ordinary
 nix path instead. That is because nix supports `https://` paths (tarballs) and
 `nix-path` can't know if such URLs really are git URLs. To force `nix-path` to
 handle a path as a git target, just add a git reference to the URL (you can
