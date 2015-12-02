@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parsers
   ( parseStringOrFail
   , parseTextOrFail
@@ -11,7 +13,6 @@ where
 import Types
 
 import Data.Attoparsec.ByteString.Char8
-import Data.Maybe
 import Control.Applicative
 import Network.Parser.Rfc3986 (absoluteUri)
 import Network.Types (uriScheme)
@@ -53,9 +54,20 @@ filePath = fmap BasicPath (many1 $ notChar ':')
 
 urlTarget :: Parser NixPathTarget
 urlTarget = do
-  (s, uri) <- match absoluteUri
-  ref <- option Nothing (fmap Just $ space *> (many1 $ notChar ':'))
-  return $ case ref of
-    Just "HEAD" -> GitPath (B.unpack s) Nothing
-    r | isJust r || elem (uriScheme uri) ["git","ssh"] -> GitPath (B.unpack s) r
-      | otherwise -> BasicPath (B.unpack s)
+  (bs, uri) <- match absoluteUri
+  rev' <- option Nothing $ fmap Just $ space *> gitRev
+  return $ case rev' of
+    Nothing | elem (uriScheme uri) ["git","ssh"] -> GitPath uri HEAD
+    Nothing -> BasicPath (B.unpack bs)
+    Just rev -> GitPath uri rev
+
+gitRev :: Parser GitRev
+gitRev = hd <|> ref <|> sha <|> branch
+  where
+    hd = "HEAD" *> return HEAD
+    ref = do
+      key <- "refs/" *> many1 (notChar '/')
+      val <- "/" *> many1 (notChar ':')
+      return $ GitRef key val
+    sha = fmap GitCommit $ many1 $ satisfy $ inClass "0123456789abcdef"
+    branch = fmap (GitRef "heads") $ many1 $ notChar ':'

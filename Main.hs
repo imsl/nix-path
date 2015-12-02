@@ -3,6 +3,7 @@
 module Main where
 
 import Types
+import GitCache
 import qualified Parsers as P
 
 import Control.Monad
@@ -55,7 +56,7 @@ renderNixPaths = fmap (concat . intersperse ":") . mapM renderPath
 
 renderNixPathTarget :: NixPathTarget -> IO String
 renderNixPathTarget (BasicPath p) = return p
-renderNixPathTarget (GitPath url branch) = undefined -- TODO clone git repo
+renderNixPathTarget (GitPath url rev) = gitClone url rev
 
 handleOpt :: ProgramOpt -> IO [NixPath]
 handleOpt (OptPathFile f) = readPathFile f

@@ -22,8 +22,13 @@ Executable nix-path
     , bytestring
     , containers
     , data-fix
+    , directory
     , filepath
     , hnix
     , hweblib
+    , process
+    , split
     , text
     , unix
+    , uuid
+    , xdg-basedir

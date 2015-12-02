@@ -1,5 +1,6 @@
 { mkDerivation, attoparsec, base, bytestring, containers, data-fix
-, filepath, hnix, hweblib, stdenv, text, unix
+, directory, filepath, hnix, hweblib, process, split, stdenv, text
+, unix, uuid, xdg-basedir
 }:
 mkDerivation {
   pname = "nix-path";
@@ -8,8 +9,8 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [
-    attoparsec base bytestring containers data-fix filepath hnix
-    hweblib text unix
+    attoparsec base bytestring containers data-fix directory filepath
+    hnix hweblib process split text unix uuid xdg-basedir
   ];
   description = "nix-path";
   license = stdenv.lib.licenses.unfree;

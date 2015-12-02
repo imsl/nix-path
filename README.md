@@ -79,9 +79,9 @@ file, but you can use the `-I` option to do that.
 
 Besides from supporting the ordinary types of nix paths (absolute or relative
 local file paths, and tarball URLs), `nix-path` supports git targets. git
-targets are defined by `ssh://` or `git://` URLs (or any valid git URL that
-ends in `.git`), and can be specified both in path files (`-f`) and directly in
-command line path arguments (`-I`).
+targets are defined by any valid git URL (the URL scheme is mandatory), and can
+be specified both in path files (`-f`) and directly in command line path
+arguments (`-I`).
 
 git targets are not downloaded to the Nix store. Instead, they are fetched to a
 cache directory that only the user running `nix-path` has access to. The
@@ -89,12 +89,26 @@ cache directory that only the user running `nix-path` has access to. The
 directory. In the end, the sources might be copied to the Nix store, depending
 on how the paths are used within your build.
 
-You can specify a particular branch or revision by appending it to the URL,
+You can specify a particular revision by appending it to the URL,
 separated by a space character (this syntax is used also by Hydra):
 
 ```
--I "nixpkgs=git@github.com:NixOS/nixpkgs.git release-15.09"
+-I "nixpkgs=ssh://git@github.com/NixOS/nixpkgs.git release-15.09"
 ```
+
+`nix-path` supports the following git revision specifiers:
+
+  * `HEAD` - refers to the head of the remote
+  * `branch name` - refers to head of the specified branch
+  * `refs/xx/yy` - an exact reference
+  * `SHA-1 hash` - an exact commit
+
+Sometimes, `nix-path` might interpret and intended git target as an ordinary
+nix path instead. That is because nix supports `https://` paths (tarballs) and
+`nix-path` can't know if such URLs really are git URLs. To force `nix-path` to
+handle a path as a git target, just add a git reference to the URL (you can
+for example use `HEAD`).
+
 
 ## Installation
 
