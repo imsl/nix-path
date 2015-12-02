@@ -5,7 +5,18 @@
 `NIX_PATH` environment variable for you when running nix tools, and gives you
 several ways to define the nix path in a controlled way.
 
-An example makes the concept easier to grasp.
+Currently, `nix-path` has not been tested enough to be considered anything
+other than a proof of concept. If you decide to try it out, please keep that in
+mind.
+
+## Installation
+
+```
+nix-env -i -f . \
+  -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-15.09.tar.gz
+```
+
+## Quick start
 
 First, let's assume you have a file called `paths.nix` in place, with the
 following contents:
@@ -108,14 +119,6 @@ nix path instead. That is because nix supports `https://` paths (tarballs) and
 `nix-path` can't know if such URLs really are git URLs. To force `nix-path` to
 handle a path as a git target, just add a git reference to the URL (you can
 for example use `HEAD`).
-
-
-## Installation
-
-```
-nix-env -i -f . \
-  -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-15.09.tar.gz
-```
 
 ## Limitations
 

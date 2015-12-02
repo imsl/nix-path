@@ -13,5 +13,5 @@ mkDerivation {
     hnix hweblib process split text unix uuid xdg-basedir
   ];
   description = "nix-path";
-  license = stdenv.lib.licenses.unfree;
+  license = stdenv.lib.licenses.mit;
 }
