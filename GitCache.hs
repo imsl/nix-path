@@ -17,14 +17,22 @@ import Network.Types hiding (HEAD)
 import System.Directory
 import System.Environment
 import System.Environment.XDG.BaseDir
+import System.Exit
 import System.FilePath.Posix
 import System.Process
+import System.IO
 
 cacheVersion :: String
 cacheVersion = "001"
 
 git :: [String] -> IO ()
-git = callProcess "git"
+git args = do
+  let cp = (proc "git" args) { std_out = UseHandle stderr }
+  (_, _, _, ph) <- createProcess cp
+  ex <- waitForProcess ph
+  case ex of
+    ExitSuccess -> return ()
+    ExitFailure _ -> error "git process failed"
 
 ifJust :: Maybe a -> (a -> c) -> c -> c
 ifJust = flip $ flip . flip maybe
