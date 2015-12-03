@@ -69,5 +69,5 @@ gitRev = hd <|> ref <|> sha <|> branch
       key <- "refs/" *> many1 (notChar '/')
       val <- "/" *> many1 (notChar ':')
       return $ GitRef key val
-    sha = fmap GitCommit $ many1 $ satisfy $ inClass "0123456789abcdef"
+    sha = fmap GitCommit $ count 40 $ satisfy $ inClass "0123456789abcdef"
     branch = fmap (GitRef "heads") $ many1 $ notChar ':'
