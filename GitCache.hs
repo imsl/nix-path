@@ -23,7 +23,7 @@ import System.Process
 import System.IO
 
 cacheVersion :: String
-cacheVersion = "001"
+cacheVersion = "002"
 
 git :: [String] -> IO ()
 git args = do
@@ -49,7 +49,7 @@ gitClone repoUri rev = do
     (sha,ref') <- resolveRev rev remote
     let wt = joinPath [wtsDir,sha]
     wtExists <- doesDirectoryExist wt
-    unless wtExists $ gitFetch remote wt sha ref'
+    unless wtExists $ gitFetch gitDir remote wt sha ref'
     return wt
 
 validWorktree :: FilePath -> GitRev -> IO (Maybe FilePath)
@@ -59,11 +59,13 @@ validWorktree wtsDir (GitCommit sha) = do
   return $ if wtExists then Just wt else Nothing
 validWorktree _ _ = return Nothing
 
-gitFetch :: String -> FilePath -> String -> Maybe String -> IO ()
-gitFetch remote wt sha ref' = do
+gitFetch :: FilePath -> String -> FilePath -> String -> Maybe String -> IO ()
+gitFetch gitDir remote wt sha ref' = do
   let tmpWt = concat [wt,"-",remote]
+      branch = "nixpath/"++sha
   git $ ["fetch","--no-tags",remote] ++ (maybeToList ref')
-  git ["worktree","add",tmpWt,sha]
+  git ["branch",branch,sha]
+  git ["clone","-b",branch,gitDir,tmpWt]
   handle
     (\(SomeException _) -> removeDirectoryRecursive tmpWt)
     (renameDirectory tmpWt wt)
