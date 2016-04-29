@@ -8,6 +8,7 @@ import qualified Parsers as P
 
 import Control.Monad
 import Data.Fix (Fix(..))
+import Data.Function (on)
 import Data.List
 import Nix.Parser
 import Nix.Eval
@@ -20,13 +21,14 @@ import qualified System.FilePath as FP
 import qualified Data.Map as M
 import qualified Data.Text as T
 
-data ProgramOpt = OptPathFile FilePath | OptNixPathEnv | OptNixPath String
+data ProgramOpt = OptPathFile FilePath | OptNixPathEnv | OptNixPath String | OptSubPath String
 
 programOptions :: [OptDescr ProgramOpt]
 programOptions =
   [ Option "f" ["pathfile"]    (ReqArg OptPathFile "FILE") "read paths from FILE"
   , Option "e" ["environment"] (NoArg OptNixPathEnv)       "read paths from NIX_PATH"
   , Option "I" ["path"]        (ReqArg OptNixPath "PATH")  "add path PATH"
+  , Option "s" ["subpath"]     (ReqArg OptSubPath "PATH")  "promote the sub path PATH"
   ]
 
 main :: IO ()
@@ -35,10 +37,16 @@ main = do
   args <- getArgs
   let (opts, args', err) = getOpt RequireOrder programOptions args
       opts' = if null opts then [OptPathFile "paths.nix"] else opts
+      subpaths = sortBy (flip (compare `on` length)) [s++"." | OptSubPath s <- opts']
   when (not $ null err) $ error $ "Incorrect arguments: " ++ show err
   when (null args') $ error "No program to run"
   nixpaths <- mapM handleOpt opts'
-  path <- renderNixPaths $ foldl mergeNixPaths [] nixpaths
+  let nixpaths' = foldl mergeNixPaths [] nixpaths
+      nixpaths'' = mergeNixPaths nixpaths' $ do
+                    PrefixPath p t <- nixpaths'
+                    Just p' <- map (flip stripPrefix p) subpaths
+                    return (PrefixPath p' t)
+  path <- renderNixPaths nixpaths''
   let env' = ("NIX_PATH", path):(filter ((/= "NIX_PATH") . fst) env)
   executeFile (head args') True (tail args') (Just env')
 
@@ -62,6 +70,7 @@ handleOpt :: ProgramOpt -> IO [NixPath]
 handleOpt (OptPathFile f) = readPathFile f
 handleOpt (OptNixPath p) = return $ P.parseStringOrFail P.nixPaths p
 handleOpt OptNixPathEnv = readNixPathEnv
+handleOpt _ = return []
 
 readNixPathEnv :: IO [NixPath]
 readNixPathEnv = do
