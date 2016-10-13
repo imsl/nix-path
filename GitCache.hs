@@ -43,7 +43,7 @@ gitClone repoUri rev = do
   wt' <- validWorktree wtsDir rev
   ifJust wt' return $ do
     setEnv "GIT_DIR" gitDir
-    git ["init","--bare"]
+    git ["init","--quiet","--bare"]
     remote <- fmap toString nextRandom
     git ["remote", "add", remote, uriToString repoUri]
     (sha,ref') <- resolveRev rev remote
