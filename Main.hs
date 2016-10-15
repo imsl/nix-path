@@ -21,7 +21,13 @@ import qualified System.FilePath as FP
 import qualified Data.Map as M
 import qualified Data.Text as T
 
-data ProgramOpt = OptPathFile FilePath | OptNixPathEnv | OptNixPath String | OptSubPath String
+data ProgramOpt
+     = OptPathFile FilePath
+     | OptNixPathEnv
+     | OptNixPath String
+     | OptSubPath String
+     | OptOptimize
+     deriving (Eq)
 
 programOptions :: [OptDescr ProgramOpt]
 programOptions =
@@ -29,6 +35,7 @@ programOptions =
   , Option "e" ["environment"] (NoArg OptNixPathEnv)       "read paths from NIX_PATH"
   , Option "I" ["path"]        (ReqArg OptNixPath "PATH")  "add path PATH"
   , Option "s" ["subpath"]     (ReqArg OptSubPath "PATH")  "promote the sub path PATH"
+  , Option "O" ["optimize"]    (NoArg OptOptimize)         "optimize the cache"
   ]
 
 main :: IO ()
@@ -39,6 +46,9 @@ main = do
       opts' = if null opts then [OptPathFile "paths.nix"] else opts
       subpaths = sortBy (flip (compare `on` length)) [s++"." | OptSubPath s <- opts']
   when (not $ null err) $ error $ "Incorrect arguments: " ++ show err
+  when (OptOptimize `elem` opts) $ do
+    putStrLn "Optimising the nix-path cache..."
+    optimizeCache
   when (null args') $ error "No program to run"
   nixpaths <- mapM handleOpt opts'
   let nixpaths' = foldl mergeNixPaths [] nixpaths

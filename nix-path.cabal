@@ -11,20 +11,28 @@ Cabal-version:       >=1.10
 Executable nix-path
   Default-language: Haskell2010
   Main-is: Main.hs
-  Ghc-options: -Wall
+  Ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   Build-depends:
       base  >= 4.3 && < 5
+    , async
     , attoparsec
     , bytestring
     , containers
     , data-fix
     , directory
+    , dirstream
     , filepath
+    , system-filepath
     , hnix
     , hweblib
     , process
+    , pipes
+    , pipes-concurrency
+    , pipes-safe
+    , random
     , split
     , text
     , unix
     , uuid
     , xdg-basedir
+    , xxhash

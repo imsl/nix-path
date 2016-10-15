@@ -1,29 +1,41 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module GitCache
   ( gitClone
+  , optimizeCache
   )
 where
 
 import Types
+import Dedup
 
 import Control.Monad
 import Control.Exception
 import Data.Char
-import Data.List
+import Data.Foldable
 import Data.List.Split
 import Data.Maybe
-import Data.UUID
+import Data.Typeable
+import Data.UUID hiding (fromString)
 import Data.UUID.V4
 import Network.Types hiding (HEAD)
 import System.Directory
 import System.Environment
 import System.Environment.XDG.BaseDir
 import System.Exit
-import System.FilePath.Posix
+import System.FilePath
 import System.Process
-import System.IO
+import System.IO (stderr)
 
 cacheVersion :: String
 cacheVersion = "002"
+
+data GitCacheException
+  = GitCmdException
+  | GitFileException
+  deriving (Show, Typeable)
+
+instance Exception GitCacheException
 
 git :: [String] -> IO ()
 git args = do
@@ -32,14 +44,15 @@ git args = do
   ex <- waitForProcess ph
   case ex of
     ExitSuccess -> return ()
-    ExitFailure _ -> error "git process failed"
+    ExitFailure _ -> throw GitCmdException
 
 ifJust :: Maybe a -> (a -> c) -> c -> c
 ifJust = flip $ flip . flip maybe
 
 gitClone :: URI -> GitRev -> IO String
 gitClone repoUri rev = do
-  [gitDir, wtsDir] <- setupDirs repoUri
+  [gitDir, wtsDir, linkDir] <- setupDirs
+  setupRepoDir gitDir repoUri
   wt' <- validWorktree wtsDir rev
   ifJust wt' return $ do
     setEnv "GIT_DIR" gitDir
@@ -49,7 +62,7 @@ gitClone repoUri rev = do
     (sha,ref') <- resolveRev rev remote
     let wt = joinPath [wtsDir,sha]
     wtExists <- doesDirectoryExist wt
-    unless wtExists $ gitFetch gitDir remote wt sha ref'
+    unless wtExists $ gitFetch linkDir gitDir remote wt sha ref'
     return wt
 
 validWorktree :: FilePath -> GitRev -> IO (Maybe FilePath)
@@ -59,16 +72,21 @@ validWorktree wtsDir (GitCommit sha) = do
   return $ if wtExists then Just wt else Nothing
 validWorktree _ _ = return Nothing
 
-gitFetch :: FilePath -> String -> FilePath -> String -> Maybe String -> IO ()
-gitFetch gitDir remote wt sha ref' = do
+gitFetch :: FilePath -> FilePath -> String -> FilePath -> String -> Maybe String -> IO ()
+gitFetch linkDir gitDir remote wt sha ref' = do
   let tmpWt = concat [wt,"-",remote]
       branch = "nixpath/"++sha
-  git $ ["fetch","--no-tags",remote] ++ (maybeToList ref')
-  git ["branch",branch,sha]
-  git ["clone","-b",branch,gitDir,tmpWt]
-  handle
-    (\(SomeException _) -> removeDirectoryRecursive tmpWt)
-    (renameDirectory tmpWt wt)
+  flip onException (cleanupDir tmpWt) $ do
+    git $ ["fetch","--no-tags",remote] ++ (maybeToList ref')
+    git ["branch","--force",branch,sha]
+    git ["clone","-b",branch,gitDir,tmpWt]
+    removeDirectoryRecursive (combine tmpWt ".git")
+    dedupDir linkDir tmpWt
+    renameDirectory tmpWt wt
+  where
+    cleanupDir dir = do
+      dirExists <- doesDirectoryExist dir
+      when dirExists (removeDirectoryRecursive dir)
 
 resolveRev :: GitRev -> String -> IO (String, Maybe String)
 resolveRev HEAD = resolveSha "HEAD"
@@ -91,13 +109,22 @@ resolveSha ref remote = do
       sha = maybe (error $ "Could not find SHA for ref "++ref) id sha'
   return (sha, Just ref)
 
-setupDirs :: URI -> IO [FilePath]
-setupDirs repoUri = do
+optimizeCache :: IO ()
+optimizeCache = do
+  [_, wtsDir, linkDir] <- setupDirs
+  dedupDir linkDir wtsDir
+
+setupDirs :: IO [FilePath]
+setupDirs = do
   cacheDir <- getUserCacheDir "nix-path"
-  forM [combine "git" repo, "wts"] $ \d -> do
+  forM ["git", "wts", "links"] $ \d -> do
     let dir = joinPath [cacheDir,cacheVersion,d]
     createDirectoryIfMissing True dir
     return dir
+
+setupRepoDir :: FilePath -> URI -> IO ()
+setupRepoDir gitDir repoUri = do
+  createDirectoryIfMissing True (combine gitDir repo)
   where repo = filter isAlphaNum $ concat
                  [ maybe "" uriRegName (uriAuthority (repoUri))
                  , maybe "" uriPort (uriAuthority (repoUri))
