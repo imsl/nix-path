@@ -1,13 +1,9 @@
 let
 
-  nixpkgs-master = "https://github.com/NixOS/nixpkgs/archive/master.tar.gz";
-
-  nixpkgs-1509 = "https://github.com/NixOS/nixpkgs-channels/archive/nixos-15.09.tar.gz";
+  nixpkgs-1609 = "https://github.com/NixOS/nixpkgs release-16.09";
 
 in {
-  nixpkgs = nixpkgs-1509;
 
-  # Unfortunately, hnix does not yet support 'inherit'
-  nixpkgs-master = nixpkgs-master;
-  nixpkgs-1509 = nixpkgs-1509;
+  nixpkgs = nixpkgs-1609;
+
 }

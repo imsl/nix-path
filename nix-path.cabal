@@ -23,7 +23,7 @@ Executable nix-path
     , dirstream
     , filepath
     , system-filepath
-    , hnix
+    , hnix >= 0.3.4
     , hweblib
     , process
     , pipes

@@ -12,7 +12,6 @@ import Data.Function (on)
 import Data.List
 import Nix.Parser
 import Nix.Eval
-import Nix.Types
 import System.Console.GetOpt
 import System.Environment (getArgs)
 import System.Posix.Process
@@ -102,7 +101,7 @@ readPathFile file = parseNixFile file >>= eval
 
     toPath (k, (Fix (NVStr s))) =
       PrefixPath (T.unpack k) (P.parseTextOrFail P.nixPathTarget s)
-    toPath (k, (Fix (NVConstant (NPath False p)))) =
+    toPath (k, (Fix (NVLiteralPath p))) =
       PrefixPath (T.unpack k) (P.parseStringOrFail P.nixPathTarget p')
       where p' = FP.normalise $ FP.combine (FP.takeDirectory file) p
     toPath (k, (Fix nv)) =
