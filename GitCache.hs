@@ -132,14 +132,16 @@ setupRepoDir gitDir repoUri = do
                  ]
 
 uriToString :: URI -> String
-uriToString uri = concat
-  [ uriScheme uri
-  , "://"
-  , maybe "" mkAuth (uriAuthority uri)
-  , uriPath uri
-  , maybeString ('?':) (uriQuery uri)
-  , maybeString ('#':) (uriFragment uri)
-  ]
+uriToString uri
+  | uriScheme uri == "file" = uriPath uri
+  | otherwise = concat
+    [ uriScheme uri
+    , "://"
+    , maybe "" mkAuth (uriAuthority uri)
+    , uriPath uri
+    , maybeString ('?':) (uriQuery uri)
+    , maybeString ('#':) (uriFragment uri)
+    ]
   where maybeString _ "" = ""
         maybeString f s = f s
         mkAuth auth = concat

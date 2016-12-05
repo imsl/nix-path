@@ -15,7 +15,7 @@ import Types
 import Data.Attoparsec.ByteString.Char8
 import Control.Applicative
 import Network.Parser.Rfc3986 (absoluteUri)
-import Network.Types (uriScheme)
+import Network.Types (URI(..), uriScheme)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import Data.Text.Encoding
@@ -50,7 +50,13 @@ nixPathTarget = urlTarget <|> filePath
 -- There is no way to pass a filename containing ':' to nix
 -- through NIX_PATH so we simply forbid such paths here
 filePath :: Parser NixPathTarget
-filePath = fmap BasicPath (many1 $ notChar ':')
+filePath = do
+  p <- many1 $ satisfy (flip notElem [' ',':'])
+  rev' <- option Nothing $ fmap Just $ space *> gitRev
+  let uri = URI "file" Nothing p "" ""
+  return $ case rev' of
+    Nothing -> BasicPath p
+    Just rev -> GitPath uri rev
 
 urlTarget :: Parser NixPathTarget
 urlTarget = do
