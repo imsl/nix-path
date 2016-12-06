@@ -1,7 +1,7 @@
 { mkDerivation, async, attoparsec, base, bytestring, containers
 , data-fix, directory, dirstream, filepath, hnix, hweblib, pipes
 , pipes-concurrency, pipes-safe, process, random, split, stdenv
-, system-filepath, text, unix, uuid, xdg-basedir, xxhash
+, system-filepath, temporary, text, unix, uuid, xdg-basedir, xxhash
 }:
 mkDerivation {
   pname = "nix-path";
@@ -12,8 +12,8 @@ mkDerivation {
   executableHaskellDepends = [
     async attoparsec base bytestring containers data-fix directory
     dirstream filepath hnix hweblib pipes pipes-concurrency pipes-safe
-    process random split system-filepath text unix uuid xdg-basedir
-    xxhash
+    process random split system-filepath temporary text unix uuid
+    xdg-basedir xxhash
   ];
   description = "nix-path";
   license = stdenv.lib.licenses.mit;

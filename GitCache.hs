@@ -3,6 +3,7 @@
 module GitCache
   ( gitClone
   , optimizeCache
+  , getCacheDirs
   )
 where
 
@@ -11,7 +12,6 @@ import Dedup
 
 import Control.Monad
 import Control.Exception
-import Data.Char
 import Data.Foldable
 import Data.List.Split
 import Data.Maybe
@@ -46,31 +46,28 @@ git args = do
     ExitSuccess -> return ()
     ExitFailure _ -> throw GitCmdException
 
-ifJust :: Maybe a -> (a -> c) -> c -> c
-ifJust = flip $ flip . flip maybe
-
 gitClone :: URI -> GitRev -> IO String
-gitClone repoUri rev = do
-  [gitDir, wtsDir, linkDir] <- setupDirs
-  setupRepoDir gitDir repoUri
-  wt' <- validWorktree wtsDir rev
-  ifJust wt' return $ do
-    setEnv "GIT_DIR" gitDir
-    git ["init","--quiet","--bare"]
-    remote <- fmap toString nextRandom
-    git ["remote", "add", remote, uriToString repoUri]
-    (sha,ref') <- resolveRev rev remote
-    let wt = joinPath [wtsDir,sha]
-    wtExists <- doesDirectoryExist wt
-    unless wtExists $ gitFetch linkDir gitDir remote wt sha ref'
-    return wt
 
-validWorktree :: FilePath -> GitRev -> IO (Maybe FilePath)
-validWorktree wtsDir (GitCommit sha) = do
+gitClone repoUri rev@(GitCommit sha) = do
+  CacheDirs { cdWts = wtsDir } <- getCacheDirs
   let wt = joinPath [wtsDir,sha]
   wtExists <- doesDirectoryExist wt
-  return $ if wtExists then Just wt else Nothing
-validWorktree _ _ = return Nothing
+  if wtExists then return sha else gitCloneNew repoUri rev
+
+gitClone repoUri rev = gitCloneNew repoUri rev
+
+gitCloneNew :: URI -> GitRev -> IO String
+gitCloneNew repoUri  rev = do
+  CacheDirs { cdWts = wtsDir, cdGit = gitDir, cdLinks = linkDir } <- getCacheDirs
+  setEnv "GIT_DIR" gitDir
+  git ["init","--quiet","--bare"]
+  remote <- fmap toString nextRandom
+  git ["remote", "add", remote, uriToString repoUri]
+  (sha,ref') <- resolveRev rev remote
+  let wt = joinPath [wtsDir,sha]
+  wtExists <- doesDirectoryExist wt
+  unless wtExists $ gitFetch linkDir gitDir remote wt sha ref'
+  return sha
 
 gitFetch :: FilePath -> FilePath -> String -> FilePath -> String -> Maybe String -> IO ()
 gitFetch linkDir gitDir remote wt sha ref' = do
@@ -111,41 +108,14 @@ resolveSha ref remote = do
 
 optimizeCache :: IO ()
 optimizeCache = do
-  [_, wtsDir, linkDir] <- setupDirs
+  CacheDirs { cdWts = wtsDir, cdLinks = linkDir } <- getCacheDirs
   dedupDir linkDir wtsDir
 
-setupDirs :: IO [FilePath]
-setupDirs = do
+getCacheDirs :: IO CacheDirs
+getCacheDirs = do
   cacheDir <- getUserCacheDir "nix-path"
-  forM ["git", "wts", "links"] $ \d -> do
+  [git',wts,links,tmp] <- forM ["git", "wts", "links", "tmp"] $ \d -> do
     let dir = joinPath [cacheDir,cacheVersion,d]
     createDirectoryIfMissing True dir
     return dir
-
-setupRepoDir :: FilePath -> URI -> IO ()
-setupRepoDir gitDir repoUri = do
-  createDirectoryIfMissing True (combine gitDir repo)
-  where repo = filter isAlphaNum $ concat
-                 [ maybe "" uriRegName (uriAuthority (repoUri))
-                 , maybe "" uriPort (uriAuthority (repoUri))
-                 , uriPath repoUri
-                 ]
-
-uriToString :: URI -> String
-uriToString uri
-  | uriScheme uri == "file" = uriPath uri
-  | otherwise = concat
-    [ uriScheme uri
-    , "://"
-    , maybe "" mkAuth (uriAuthority uri)
-    , uriPath uri
-    , maybeString ('?':) (uriQuery uri)
-    , maybeString ('#':) (uriFragment uri)
-    ]
-  where maybeString _ "" = ""
-        maybeString f s = f s
-        mkAuth auth = concat
-          [ maybeString (++"@") (uriUserInfo auth)
-          , uriRegName auth
-          , maybeString (':':) (uriPort auth)
-          ]
+  return $ CacheDirs { cdGit = git', cdWts = wts, cdLinks = links, cdTmp = tmp }

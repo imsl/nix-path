@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Main where
 
@@ -7,13 +8,19 @@ import GitCache
 import qualified Parsers as P
 
 import Control.Monad
+import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.Digest.XXHash
 import Data.Fix (Fix(..))
 import Data.Function (on)
 import Data.List
 import Nix.Parser
 import Nix.Eval
+import Numeric
 import System.Console.GetOpt
+import System.Directory
 import System.Environment (getArgs)
+import System.FilePath
+import System.IO
 import System.Posix.Process
 import System.Posix.Env
 import qualified System.FilePath as FP
@@ -55,7 +62,9 @@ main = do
                     PrefixPath p t <- nixpaths'
                     Just p' <- map (flip stripPrefix p) subpaths
                     return (PrefixPath p' t)
-  path <- renderNixPaths nixpaths''
+  nixpaths''' <- fetchNixPaths nixpaths''
+  fp <- generateNixPathsFile nixpaths'''
+  path <- renderNixPaths $ PrefixPath "nix-paths" (BasicPath fp) : nixpaths'''
   let env' = ("NIX_PATH", path):(filter ((/= "NIX_PATH") . fst) env)
   executeFile (head args') True (tail args') (Just env')
 
@@ -64,16 +73,42 @@ mergeNixPaths ps1 ps2 = nubBy f (ps2 ++ ps1)
   where f (PrefixPath k1 _) (PrefixPath k2 _) = k1 == k2
         f _ _ = False
 
-renderNixPaths :: [NixPath] -> IO String
-renderNixPaths = fmap (concat . intersperse ":") . mapM renderPath
-  where renderPath (PrefixPath p t) = do
-          t' <- renderNixPathTarget t
-          return $ concat [p, "=", t']
-        renderPath (RootPath t) = renderNixPathTarget t
+fetchNixPaths :: [NixPath] -> IO [NixPath]
+fetchNixPaths = mapM fetchNixPath
+  where
+    fetchNixPath (PrefixPath k g@(GitPath _ _)) = fmap (PrefixPath k) (clone g)
+    fetchNixPath (RootPath g@(GitPath _ _)) = fmap (RootPath) (clone g)
+    fetchNixPath p = return p
+    clone (GitPath uri rev) = do
+      sha <- gitClone uri rev
+      return $ GitPath uri (GitCommit sha)
+    clone _ = error "Can't clone non-git path"
 
-renderNixPathTarget :: NixPathTarget -> IO String
-renderNixPathTarget (BasicPath p) = return p
-renderNixPathTarget (GitPath url rev) = gitClone url rev
+renderNixPaths :: [NixPath] -> IO String
+renderNixPaths paths = do
+  CacheDirs { cdWts = wtsDir } <- getCacheDirs
+  let
+    renderPath (RootPath t) = renderPathTarget t
+    renderPath (PrefixPath p t) = concat [p, "=", renderPathTarget t]
+    renderPathTarget (BasicPath p) = p
+    renderPathTarget (GitPath _ (GitCommit sha)) = combine wtsDir sha
+    renderPathTarget _ = error "Trying to render un-fetched revision"
+  return $ concat $ intersperse ":" $ map renderPath paths
+
+generateNixPathsFile :: [NixPath] -> IO FilePath
+generateNixPathsFile paths = do
+  CacheDirs { cdTmp = tmpDir } <- getCacheDirs
+  let contents = nixPathsToNixExpr paths
+      fp = combine tmpDir (showHex (xxHash (BL.pack contents)) "") ++ ".nix"
+  fileExist <- doesFileExist fp
+  if fileExist
+    then return fp
+    else do
+      (tmpFile,handle) <- openTempFile tmpDir "nix-paths"
+      hPutStr handle contents
+      hClose handle
+      renameFile tmpFile fp
+      return fp
 
 handleOpt :: ProgramOpt -> IO [NixPath]
 handleOpt (OptPathFile f) = readPathFile f
