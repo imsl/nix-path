@@ -133,22 +133,26 @@ parsePathFile file = do
     Failure err -> die $ "Failed parsing path file:\n" ++ show err
     Success expr -> pure expr
 
-nixBuiltins :: NValue IO
-nixBuiltins = Fix . NVSet . M.fromList $
-  [ ("import", Fix nixImport) ]
+normaliseNixPath :: FilePath -> FilePath -> FilePath
+normaliseNixPath curFile relPath =
+  FP.normalise $ FP.combine (FP.takeDirectory curFile) relPath
 
-nixImport :: NValueF IO (NValue IO)
-nixImport = NVFunction (Param "path") $ \case
-  Fix (NVSet m) | Just (Fix (NVLiteralPath file)) <- M.lookup "path" m -> do
-    expr <- parsePathFile file
-    evalExpr expr nixBuiltins
-  nv -> die ("Invalid import argument: " ++ show nv)
+nixBuiltins :: FilePath -> NValue IO
+nixBuiltins curFile = Fix . NVSet . M.fromList $
+  [ ("import", Fix nixImport) ]
+  where
+    nixImport = NVFunction (Param "path") $ \case
+      Fix (NVSet m) | Just (Fix (NVLiteralPath file)) <- M.lookup "path" m -> do
+        let absPath = normaliseNixPath curFile file
+        expr <- parsePathFile absPath
+        evalExpr expr (nixBuiltins absPath)
+      nv -> die ("Invalid import argument: " ++ show nv)
 
 readPathFile :: FilePath -> IO [NixPath]
 readPathFile file = parsePathFile file >>= eval
   where
     eval expr = do
-      Fix val <- evalExpr expr nixBuiltins
+      Fix val <- evalExpr expr (nixBuiltins file)
       return $ toPaths val
 
     toPaths (NVSet m) = map toPath (M.toList m)
@@ -158,6 +162,6 @@ readPathFile file = parsePathFile file >>= eval
       PrefixPath (T.unpack k) (P.parseTextOrFail P.nixPathTarget s)
     toPath (k, (Fix (NVLiteralPath p))) =
       PrefixPath (T.unpack k) (P.parseStringOrFail P.nixPathTarget p')
-      where p' = FP.normalise $ FP.combine (FP.takeDirectory file) p
+      where p' = normaliseNixPath file p
     toPath (k, (Fix nv)) =
       error $ "Invalid path element " ++ (T.unpack k) ++ ". Expected string, got " ++ (show nv)
