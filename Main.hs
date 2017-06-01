@@ -53,8 +53,8 @@ main = do
   args <- getArgs
   let (opts, args', err) = getOpt RequireOrder programOptions args
       opts' = if null opts then [OptPathFile "paths.nix"] else opts
-      subpaths = sortBy (flip (compare `on` length)) [s++"." | OptSubPath s <- opts']
-  when (not $ null err) $ die $ "Incorrect arguments: " ++ show err
+      subpaths = sortBy (flip compare `on` length) [s++"." | OptSubPath s <- opts']
+  unless (null err) $ die $ "Incorrect arguments: " ++ show err
   when (OptOptimize `elem` opts) $ do
     putStrLn "Optimising the nix-path cache..."
     optimizeCache
@@ -63,12 +63,12 @@ main = do
   let nixpaths' = foldl mergeNixPaths [] nixpaths
       nixpaths'' = mergeNixPaths nixpaths' $ do
                     PrefixPath p t <- nixpaths'
-                    Just p' <- map (flip stripPrefix p) subpaths
+                    Just p' <- map (`stripPrefix` p) subpaths
                     return (PrefixPath p' t)
   nixpaths''' <- fetchNixPaths nixpaths''
   fp <- generateNixPathsFile nixpaths'''
   path <- renderNixPaths $ PrefixPath "nix-paths" (BasicPath fp) : nixpaths'''
-  let env' = ("NIX_PATH", path):(filter ((/= "NIX_PATH") . fst) env)
+  let env' = ("NIX_PATH", path) : filter ((/= "NIX_PATH") . fst) env
   executeFile (head args') True (tail args') (Just env')
 
 mergeNixPaths :: [NixPath] -> [NixPath] -> [NixPath]
@@ -80,7 +80,7 @@ fetchNixPaths :: [NixPath] -> IO [NixPath]
 fetchNixPaths = mapM fetchNixPath
   where
     fetchNixPath (PrefixPath k g@(GitPath _ _)) = fmap (PrefixPath k) (clone g)
-    fetchNixPath (RootPath g@(GitPath _ _)) = fmap (RootPath) (clone g)
+    fetchNixPath (RootPath g@(GitPath _ _)) = fmap RootPath (clone g)
     fetchNixPath p = return p
     clone (GitPath uri rev) = do
       sha <- gitClone uri rev
@@ -96,7 +96,7 @@ renderNixPaths paths = do
     renderPathTarget (BasicPath p) = p
     renderPathTarget (GitPath _ (GitCommit sha)) = combine wtsDir sha
     renderPathTarget _ = errorWithoutStackTrace "Trying to render un-fetched revision"
-  return $ concat $ intersperse ":" $ map renderPath paths
+  return $ intercalate ":" $ map renderPath paths
 
 generateNixPathsFile :: [NixPath] -> IO FilePath
 generateNixPathsFile paths = do
@@ -158,12 +158,12 @@ readPathFile file = parsePathFile file >>= eval
     toPaths (NVSet m) = map toPath (M.toList m)
     toPaths _ = errorWithoutStackTrace "Invalid path file (attr set expected)"
 
-    toPath (k, (Fix (NVStr s))) =
+    toPath (k, Fix (NVStr s)) =
       PrefixPath (T.unpack k) (P.parseTextOrFail P.nixPathTarget s)
-    toPath (k, (Fix (NVLiteralPath p))) =
+    toPath (k, Fix (NVLiteralPath p)) =
       PrefixPath (T.unpack k) (P.parseStringOrFail P.nixPathTarget p')
       where p' = normaliseNixPath file p
-    toPath (k, (Fix nv)) =
+    toPath (k, Fix nv) =
       errorWithoutStackTrace $
-        "Invalid path element " ++ (T.unpack k) ++
-        ". Expected string, got " ++ (show nv)
+        "Invalid path element " ++ T.unpack k ++
+        ". Expected string, got " ++ show nv
