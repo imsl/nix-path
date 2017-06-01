@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -15,8 +16,10 @@ import Data.Function (on)
 import Data.List
 import Nix.Parser
 import Nix.Eval
+import Nix.Expr
 import Numeric
 import System.Console.GetOpt
+import System.Exit
 import System.Directory
 import System.Environment (getArgs)
 import System.FilePath
@@ -123,12 +126,29 @@ readNixPathEnv = do
     Nothing -> return []
     Just nixpaths -> return $ P.parseStringOrFail P.nixPaths nixpaths
 
+parsePathFile :: FilePath -> IO NExpr
+parsePathFile file = do
+  result <- parseNixFile file
+  case result of
+    Failure err -> die $ "Failed parsing path file:\n" ++ show err
+    Success expr -> pure expr
+
+nixBuiltins :: NValue IO
+nixBuiltins = Fix . NVSet . M.fromList $
+  [ ("import", Fix nixImport) ]
+
+nixImport :: NValueF IO (NValue IO)
+nixImport = NVFunction (Param "path") $ \case
+  Fix (NVSet m) | Just (Fix (NVLiteralPath file)) <- M.lookup "path" m -> do
+    expr <- parsePathFile file
+    evalExpr expr nixBuiltins
+  nv -> die ("Invalid import argument: " ++ show nv)
+
 readPathFile :: FilePath -> IO [NixPath]
-readPathFile file = parseNixFile file >>= eval
+readPathFile file = parsePathFile file >>= eval
   where
-    eval (Failure err) = error $ "Failed parsing path file:\n" ++ show err
-    eval (Success expr) = do
-      Fix val <- evalExpr expr (Fix (NVSet M.empty))
+    eval expr = do
+      Fix val <- evalExpr expr nixBuiltins
       return $ toPaths val
 
     toPaths (NVSet m) = map toPath (M.toList m)
