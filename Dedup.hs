@@ -57,7 +57,7 @@ dedupFile :: FilePath -> FilePath -> FileStatus -> Int -> IO ()
 dedupFile linkDir file stat workerId = do
   hash <- xxHash <$> BL.readFile file
   let dir = joinPath (linkDir : chunksOf 2 (showHex hash ""))
-      link = combine dir (showHex (fileSize stat) "")
+      link = combine dir (showHex (fileSize stat) "" ++ showHex (fileMode stat) "")
       tmp = combine linkDir (show workerId)
   linkExists <- doesFileExist link
   if linkExists
