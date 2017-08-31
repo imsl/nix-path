@@ -5,7 +5,9 @@ import Network.Types hiding (HEAD)
 
 data NixPath = RootPath NixPathTarget | PrefixPath String NixPathTarget
 
-data NixPathTarget = BasicPath String | GitPath URI GitRev
+data NixPathTarget = BasicPath String
+                   | GitPath URI GitRev
+                   | FetchedGitPath FilePath URI GitRev
 
 data GitRev = GitCommit String | HEAD | GitRef String String
 
@@ -18,6 +20,7 @@ data CacheDirs = CacheDirs { cdGit :: FilePath
 instance Show NixPathTarget where
   show (BasicPath p) = concat ["\"", p, "\""]
   show (GitPath uri rev) = concat ["\"", uriToString uri, " ", show rev, "\""]
+  show (FetchedGitPath _ uri rev) = show (GitPath uri rev)
 
 instance Show GitRev where
   show (GitCommit sha) = sha

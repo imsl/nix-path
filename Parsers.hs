@@ -34,7 +34,7 @@ parseOrFail p = orFail . parseOnly (p <* endOfInput)
 nixPaths :: Parser [NixPath]
 nixPaths = nixPath `sepBy1` (char ':')
 
-nixPath :: Parser NixPath
+nixPath :: Parser (NixPath)
 nixPath = prefixPath <|> rootPath
   where
     rootPath = fmap RootPath nixPathTarget

@@ -36,24 +36,28 @@ data ProgramOpt
      | OptNixPath String
      | OptSubPath String
      | OptOptimize
+     | OptUseNixStore
      deriving (Eq)
 
 programOptions :: [OptDescr ProgramOpt]
 programOptions =
-  [ Option "f" ["pathfile"]    (ReqArg OptPathFile "FILE") "read paths from FILE"
-  , Option "e" ["environment"] (NoArg OptNixPathEnv)       "read paths from NIX_PATH"
-  , Option "I" ["path"]        (ReqArg OptNixPath "PATH")  "add path PATH"
-  , Option "s" ["subpath"]     (ReqArg OptSubPath "PATH")  "promote the sub path PATH"
-  , Option "O" ["optimize"]    (NoArg OptOptimize)         "optimize the cache"
+  [ Option "f" ["pathfile"]      (ReqArg OptPathFile "FILE") "read paths from FILE"
+  , Option "e" ["environment"]   (NoArg OptNixPathEnv)       "read paths from NIX_PATH"
+  , Option "I" ["path"]          (ReqArg OptNixPath "PATH")  "add path PATH"
+  , Option "s" ["subpath"]       (ReqArg OptSubPath "PATH")  "promote the sub path PATH"
+  , Option "O" ["optimize"]      (NoArg OptOptimize)         "optimize the cache"
+  , Option "n" ["use-nix-store"] (NoArg OptUseNixStore)     "add paths to the nix store"
   ]
 
 main :: IO ()
 main = do
   env <- getEnvironment
   args <- getArgs
+  useNixStoreEnv <- getEnvDefault "NIX_PATH_USE_NIX_STORE" "0"
   let (opts, args', err) = getOpt RequireOrder programOptions args
       opts' = if null opts then [OptPathFile "paths.nix"] else opts
       subpaths = sortBy (flip compare `on` length) [s++"." | OptSubPath s <- opts']
+      useNixStore = OptUseNixStore `elem` opts' || useNixStoreEnv /= "0"
   unless (null err) $ die $ "Incorrect arguments: " ++ show err
   when (OptOptimize `elem` opts) $ do
     putStrLn "Optimising the nix-path cache..."
@@ -65,10 +69,10 @@ main = do
                     PrefixPath p t <- nixpaths'
                     Just p' <- map (`stripPrefix` p) subpaths
                     return (PrefixPath p' t)
-  nixpaths''' <- fetchNixPaths nixpaths''
+  nixpaths''' <- fetchNixPaths useNixStore nixpaths''
   fp <- generateNixPathsFile nixpaths'''
-  path <- renderNixPaths $ PrefixPath "nix-paths" (BasicPath fp) : nixpaths'''
-  let env' = ("NIX_PATH", path) : filter ((/= "NIX_PATH") . fst) env
+  let path = renderNixPaths $ PrefixPath "nix-paths" (BasicPath fp) : nixpaths'''
+      env' = ("NIX_PATH", path) : filter ((/= "NIX_PATH") . fst) env
   executeFile (head args') True (tail args') (Just env')
 
 mergeNixPaths :: [NixPath] -> [NixPath] -> [NixPath]
@@ -76,27 +80,23 @@ mergeNixPaths ps1 ps2 = nubBy f (ps2 ++ ps1)
   where f (PrefixPath k1 _) (PrefixPath k2 _) = k1 == k2
         f _ _ = False
 
-fetchNixPaths :: [NixPath] -> IO [NixPath]
-fetchNixPaths = mapM fetchNixPath
+fetchNixPaths :: Bool -> [NixPath] -> IO [NixPath]
+fetchNixPaths useNixStore = mapM fetchNixPath
   where
-    fetchNixPath (PrefixPath k g@(GitPath _ _)) = fmap (PrefixPath k) (clone g)
-    fetchNixPath (RootPath g@(GitPath _ _)) = fmap RootPath (clone g)
+    fetchNixPath (PrefixPath k (GitPath uri rev)) =
+      fmap (PrefixPath k) (gitClone useNixStore uri rev)
+    fetchNixPath (RootPath (GitPath uri rev)) =
+      fmap RootPath (gitClone useNixStore uri rev)
     fetchNixPath p = return p
-    clone (GitPath uri rev) = do
-      sha <- gitClone uri rev
-      return $ GitPath uri (GitCommit sha)
-    clone _ = die "Can't clone non-git path"
 
-renderNixPaths :: [NixPath] -> IO String
-renderNixPaths paths = do
-  CacheDirs { cdWts = wtsDir } <- getCacheDirs
-  let
+renderNixPaths :: [NixPath] -> String
+renderNixPaths paths = intercalate ":" $ map renderPath paths
+  where
     renderPath (RootPath t) = renderPathTarget t
     renderPath (PrefixPath p t) = concat [p, "=", renderPathTarget t]
     renderPathTarget (BasicPath p) = p
-    renderPathTarget (GitPath _ (GitCommit sha)) = combine wtsDir sha
+    renderPathTarget (FetchedGitPath p _ _) = p
     renderPathTarget _ = errorWithoutStackTrace "Trying to render un-fetched revision"
-  return $ intercalate ":" $ map renderPath paths
 
 generateNixPathsFile :: [NixPath] -> IO FilePath
 generateNixPathsFile paths = do
