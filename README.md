@@ -13,7 +13,7 @@ mind.
 
 ```
 nix-env -i -f . \
-  -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-15.09.tar.gz
+  -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/release-17.09.tar.gz
 ```
 
 ## Quick start
