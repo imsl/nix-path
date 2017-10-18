@@ -163,7 +163,7 @@ readPathFile file = parsePathFile file >>= eval
       PrefixPath (T.unpack k) (P.parseTextOrFail parser s)
       where parser = P.nixPathTarget (normaliseNixPath file)
     toPath (k, Fix (NVLiteralPath p)) =
-      PrefixPath (T.unpack k) (P.parseStringOrFail P.nixPathTarget p')
+      PrefixPath (T.unpack k) (BasicPath p')
       where p' = normaliseNixPath file p
     toPath (k, Fix nv) =
       errorWithoutStackTrace $
