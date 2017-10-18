@@ -96,7 +96,22 @@ renderNixPaths paths = intercalate ":" $ map renderPath paths
     renderPath (PrefixPath p t) = concat [p, "=", renderPathTarget t]
     renderPathTarget (BasicPath p) = p
     renderPathTarget (FetchedGitPath p _ _) = p
+    renderPathTarget (PathRef p) = resolvePathRef paths p
     renderPathTarget _ = errorWithoutStackTrace "Trying to render un-fetched revision"
+
+resolvePathRef :: [NixPath] -> FilePath -> String
+resolvePathRef paths p =
+  case targets of
+    (BasicPath p'):[] -> FP.combine p' p
+    (FetchedGitPath p' _ _):[] -> FP.combine p' p
+    (PathRef _):[] -> errorWithoutStackTrace $
+      "The path reference " ++ p ++ " can't refer to another path reference"
+    _:_:[] -> errorWithoutStackTrace $
+      "Multiple paths matches the reference " ++ p
+    _ -> errorWithoutStackTrace $ "No path matches the reference " ++ p
+  where
+    root = head $ splitDirectories p
+    targets = [ t | PrefixPath p' t <- paths, p' == root ]
 
 generateNixPathsFile :: [NixPath] -> IO FilePath
 generateNixPathsFile paths = do
@@ -165,6 +180,8 @@ readPathFile file = parsePathFile file >>= eval
     toPath (k, Fix (NVLiteralPath p)) =
       PrefixPath (T.unpack k) (BasicPath p')
       where p' = normaliseNixPath file p
+    toPath (k, Fix (NVEnvPath p)) =
+      PrefixPath (T.unpack k) (PathRef p)
     toPath (k, Fix nv) =
       errorWithoutStackTrace $
         "Invalid path element " ++ T.unpack k ++

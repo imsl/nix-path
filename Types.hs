@@ -8,6 +8,7 @@ data NixPath = RootPath NixPathTarget | PrefixPath String NixPathTarget
 data NixPathTarget = BasicPath String
                    | GitPath URI GitRev
                    | FetchedGitPath FilePath URI GitRev
+                   | PathRef FilePath
 
 data GitRev = GitCommit String | HEAD | GitRef String String
 
@@ -21,6 +22,7 @@ instance Show NixPathTarget where
   show (BasicPath p) = concat ["\"", p, "\""]
   show (GitPath uri rev) = concat ["\"", uriToString uri, " ", show rev, "\""]
   show (FetchedGitPath _ uri rev) = show (GitPath uri rev)
+  show (PathRef p) = concat ["<", p, ">"]
 
 instance Show GitRev where
   show (GitCommit sha) = sha
