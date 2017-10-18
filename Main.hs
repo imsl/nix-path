@@ -114,7 +114,7 @@ generateNixPathsFile paths = do
       return fp
 
 handleOpt :: ProgramOpt -> IO [NixPath]
-handleOpt (OptPathFile f) = readPathFile f
+handleOpt (OptPathFile f) = makeAbsolute f >>= readPathFile
 handleOpt (OptNixPath p) = return $ P.parseStringOrFail P.nixPaths p
 handleOpt OptNixPathEnv = readNixPathEnv
 handleOpt _ = return []
@@ -135,7 +135,8 @@ parsePathFile file = do
 
 normaliseNixPath :: FilePath -> FilePath -> FilePath
 normaliseNixPath curFile relPath =
-  FP.normalise $ FP.combine (FP.takeDirectory curFile) relPath
+  FP.dropTrailingPathSeparator $ FP.normalise $
+    FP.combine (FP.takeDirectory curFile) relPath
 
 nixBuiltins :: FilePath -> NValue IO
 nixBuiltins curFile = Fix . NVSet . M.fromList $
@@ -159,7 +160,8 @@ readPathFile file = parsePathFile file >>= eval
     toPaths _ = errorWithoutStackTrace "Invalid path file (attr set expected)"
 
     toPath (k, Fix (NVStr s)) =
-      PrefixPath (T.unpack k) (P.parseTextOrFail P.nixPathTarget s)
+      PrefixPath (T.unpack k) (P.parseTextOrFail parser s)
+      where parser = P.nixPathTarget (normaliseNixPath file)
     toPath (k, Fix (NVLiteralPath p)) =
       PrefixPath (T.unpack k) (P.parseStringOrFail P.nixPathTarget p')
       where p' = normaliseNixPath file p

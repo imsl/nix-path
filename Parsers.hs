@@ -37,25 +37,25 @@ nixPaths = nixPath `sepBy1` (char ':')
 nixPath :: Parser (NixPath)
 nixPath = prefixPath <|> rootPath
   where
-    rootPath = fmap RootPath nixPathTarget
+    rootPath = fmap RootPath (nixPathTarget id)
     prefixPath = do
       prefix <- many1 $ satisfy $ notInClass ":="
       _ <- char '='
-      target <- nixPathTarget
+      target <- nixPathTarget id
       return $ PrefixPath prefix target
 
-nixPathTarget :: Parser NixPathTarget
-nixPathTarget = urlTarget <|> filePath
+nixPathTarget :: (FilePath -> FilePath) -> Parser NixPathTarget
+nixPathTarget norm = urlTarget <|> filePath norm
 
 -- There is no way to pass a filename containing ':' to nix
 -- through NIX_PATH so we simply forbid such paths here
-filePath :: Parser NixPathTarget
-filePath = do
+filePath :: (FilePath -> FilePath) -> Parser NixPathTarget
+filePath norm = do
   p <- many1 $ satisfy (flip notElem [' ',':'])
   rev' <- option Nothing $ fmap Just $ space *> gitRev
   let uri = URI "file" Nothing p "" ""
   return $ case rev' of
-    Nothing -> BasicPath p
+    Nothing -> BasicPath (norm p)
     Just rev -> GitPath uri rev
 
 urlTarget :: Parser NixPathTarget
