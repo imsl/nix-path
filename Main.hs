@@ -102,15 +102,15 @@ renderNixPaths paths = intercalate ":" $ map renderPath paths
 resolvePathRef :: [NixPath] -> FilePath -> String
 resolvePathRef paths p =
   case targets of
-    (BasicPath p'):[] -> FP.combine p' p
-    (FetchedGitPath p' _ _):[] -> FP.combine p' p
+    (BasicPath p'):[] -> FP.joinPath (p':ps)
+    (FetchedGitPath p' _ _):[] -> FP.joinPath (p':ps)
     (PathRef _):[] -> errorWithoutStackTrace $
       "The path reference " ++ p ++ " can't refer to another path reference"
     _:_:[] -> errorWithoutStackTrace $
       "Multiple paths matches the reference " ++ p
     _ -> errorWithoutStackTrace $ "No path matches the reference " ++ p
   where
-    root = head $ splitDirectories p
+    (root:ps) = splitDirectories p
     targets = [ t | PrefixPath p' t <- paths, p' == root ]
 
 generateNixPathsFile :: [NixPath] -> IO FilePath
