@@ -36,16 +36,19 @@ recurseDir path = do
 
 dedupDir :: FilePath -> FilePath -> IO ()
 dedupDir linkDir dir = do
-  (output, input) <- spawn unbounded
   rnd <- getStdRandom random
   workerCount <- getNumCapabilities
-  workers <- forM [1..workerCount] $ \i -> async $ do
-               runEffect (fromInput input >-> worker (i+rnd))
-               performGC
-  producer <- async $ do
-                runSafeT $ runEffect $
-                  every (recurseDir (fromString dir)) >-> toOutput output
-                performGC
+  (producer, workers) <- withBuffer unbounded
+    (\output -> async $ do
+      runSafeT $ runEffect $
+        every (recurseDir (fromString dir)) >-> toOutput output
+      performGC
+    )
+    (\input ->
+      forM [1..workerCount] $ \i -> async $ do
+        runEffect (fromInput input >-> worker (i+rnd))
+        performGC
+    )
   mapM_ wait (producer:workers)
   where
     worker :: Int -> Consumer (FilePath, FileStatus) IO ()
