@@ -27,7 +27,7 @@ Executable nix-path
     , hweblib
     , process
     , pipes
-    , pipes-concurrency
+    , pipes-concurrency >= 2.0.8
     , pipes-safe
     , random
     , split

@@ -13,4 +13,7 @@ let
 
   hnix = haskellLib.appendPatch haskellPackages.hnix eval_env_path_patch;
 
-in haskellPackages.callPackage ./project.nix { inherit hnix; }
+in haskellPackages.callPackage ./project.nix {
+  inherit hnix;
+  pipes-concurrency = haskellPackages.pipes-concurrency_2_0_8;
+}
