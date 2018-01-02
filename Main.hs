@@ -71,8 +71,9 @@ main = do
                     return (PrefixPath p' t)
   nixpaths''' <- fetchNixPaths useNixStore nixpaths''
   fp <- generateNixPathsFile nixpaths'''
+  CacheDirs { cdGit = gitDir } <- getCacheDirs
   let path = renderNixPaths $ PrefixPath "nix-paths" (BasicPath fp) : nixpaths'''
-      env' = ("NIX_PATH", path) : filter ((/= "NIX_PATH") . fst) env
+      env' = ("NIX_PATH_GIT_CACHE", gitDir) : ("NIX_PATH", path) : filter ((/= "NIX_PATH") . fst) env
   executeFile (head args') True (tail args') (Just env')
 
 mergeNixPaths :: [NixPath] -> [NixPath] -> [NixPath]
