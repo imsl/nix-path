@@ -12,7 +12,7 @@ mind.
 ## Installation
 
 ```
-nix-env -i -f . \
+nix-env -i -f release.nix \
   -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/release-17.09.tar.gz
 ```
 

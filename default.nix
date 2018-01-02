@@ -1,19 +1,20 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghc802" }:
-
-let
-
-  haskellPackages = nixpkgs.pkgs.haskell.packages.${compiler};
-
-  haskellLib = nixpkgs.haskell.lib;
-
-  eval_env_path_patch = nixpkgs.fetchurl {
-    url = "https://patch-diff.githubusercontent.com/raw/jwiegley/hnix/pull/66.patch";
-    sha256 = "05w440xmdiz9syadbnclwk45jxpvbyzm5vwiiaw88yl16m5w1qm0";
-  };
-
-  hnix = haskellLib.appendPatch haskellPackages.hnix eval_env_path_patch;
-
-in haskellPackages.callPackage ./project.nix {
-  inherit hnix;
-  pipes-concurrency = haskellPackages.pipes-concurrency_2_0_8;
+{ mkDerivation, async, attoparsec, base, bytestring, containers
+, data-fix, directory, dirstream, filepath, hnix, hweblib, pipes
+, pipes-concurrency, pipes-safe, process, random, split, stdenv
+, system-filepath, temporary, text, unix, uuid, xdg-basedir, xxhash
+}:
+mkDerivation {
+  pname = "nix-path";
+  version = "0.0.1";
+  src = ./.;
+  isLibrary = false;
+  isExecutable = true;
+  executableHaskellDepends = [
+    async attoparsec base bytestring containers data-fix directory
+    dirstream filepath hnix hweblib pipes pipes-concurrency pipes-safe
+    process random split system-filepath temporary text unix uuid
+    xdg-basedir xxhash
+  ];
+  description = "nix-path";
+  license = stdenv.lib.licenses.mit;
 }
