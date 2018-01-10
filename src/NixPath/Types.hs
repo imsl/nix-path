@@ -3,7 +3,9 @@ module NixPath.Types where
 import Data.List (sort)
 import Network.Types hiding (HEAD)
 
-data NixPath = RootPath NixPathTarget | PrefixPath String NixPathTarget
+data NixPath = RootPath NixPathTarget
+             | PrefixPath String NixPathTarget
+             deriving (Show)
 
 data NixPathTarget = BasicPath String
                    | GitPath URI GitRev
