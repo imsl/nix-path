@@ -7,7 +7,7 @@ module GitCache
   )
 where
 
-import Types
+import NixPath.Types
 import Dedup
 
 import Control.Monad

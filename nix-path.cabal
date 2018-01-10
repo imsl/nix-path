@@ -8,23 +8,38 @@ Category:            Nix
 Build-type:          Simple
 Cabal-version:       >=1.10
 
+Library
+  hs-source-dirs: src
+  exposed-modules:
+    NixPath.Parsers
+    NixPath.Types
+  Ghc-options: -Wall
+  Build-depends:
+      base  >= 4.3 && < 5
+    , attoparsec
+    , bytestring
+    , containers
+    , hnix >= 0.3.4
+    , hweblib
+    , text
+
 Executable nix-path
   Default-language: Haskell2010
   Main-is: Main.hs
   Ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   Build-depends:
       base  >= 4.3 && < 5
+    , nix-path
     , async
-    , attoparsec
     , bytestring
     , containers
     , data-fix >= 0.0.7
     , directory
     , dirstream
     , filepath
-    , system-filepath
     , hnix >= 0.3.4
     , hweblib
+    , system-filepath
     , process
     , pipes
     , pipes-concurrency >= 2.0.8

@@ -4,9 +4,9 @@
 
 module Main where
 
-import Types
+import NixPath.Types
 import GitCache
-import qualified Parsers as P
+import qualified NixPath.Parsers as P
 
 import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BL

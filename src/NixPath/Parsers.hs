@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parsers
+module NixPath.Parsers
   ( parseStringOrFail
   , parseTextOrFail
   , parseOrFail
@@ -10,7 +10,7 @@ module Parsers
   )
 where
 
-import Types
+import NixPath.Types
 
 import Data.Attoparsec.ByteString.Char8
 import Control.Applicative
