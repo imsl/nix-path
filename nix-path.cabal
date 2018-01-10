@@ -11,6 +11,7 @@ Cabal-version:       >=1.10
 Library
   hs-source-dirs: src
   exposed-modules:
+    NixPath.PathFile
     NixPath.Parsers
     NixPath.Types
   Ghc-options: -Wall
@@ -19,9 +20,12 @@ Library
     , attoparsec
     , bytestring
     , containers
+    , data-fix >= 0.0.7
     , hnix >= 0.3.4
     , hweblib
+    , filepath
     , text
+    , unix
 
 Executable nix-path
   Default-language: Haskell2010
@@ -33,11 +37,9 @@ Executable nix-path
     , async
     , bytestring
     , containers
-    , data-fix >= 0.0.7
     , directory
     , dirstream
     , filepath
-    , hnix >= 0.3.4
     , hweblib
     , system-filepath
     , process

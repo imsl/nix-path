@@ -4,19 +4,16 @@
 
 module Main where
 
-import NixPath.Types
 import GitCache
+import NixPath.PathFile
+import NixPath.Types
 import qualified NixPath.Parsers as P
 
 import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Digest.XXHash
-import Data.Fix (Fix(..))
 import Data.Function (on)
 import Data.List
-import Nix.Parser
-import Nix.Eval
-import Nix.Expr
 import Numeric
 import System.Console.GetOpt
 import System.Exit
@@ -27,8 +24,6 @@ import System.IO
 import System.Posix.Process
 import System.Posix.Env
 import qualified System.FilePath as FP
-import qualified Data.Map as M
-import qualified Data.Text as T
 
 data ProgramOpt
      = OptPathFile FilePath
@@ -134,56 +129,3 @@ handleOpt (OptPathFile f) = makeAbsolute f >>= readPathFile
 handleOpt (OptNixPath p) = return $ P.parseStringOrFail P.nixPaths p
 handleOpt OptNixPathEnv = readNixPathEnv
 handleOpt _ = return []
-
-readNixPathEnv :: IO [NixPath]
-readNixPathEnv = do
-  mnp <- getEnv "NIX_PATH"
-  case mnp of
-    Nothing -> return []
-    Just nixpaths -> return $ P.parseStringOrFail P.nixPaths nixpaths
-
-parsePathFile :: FilePath -> IO NExpr
-parsePathFile file = do
-  result <- parseNixFile file
-  case result of
-    Failure err -> die $ "Failed parsing path file:\n" ++ show err
-    Success expr -> pure expr
-
-normaliseNixPath :: FilePath -> FilePath -> FilePath
-normaliseNixPath curFile relPath =
-  FP.dropTrailingPathSeparator $ FP.normalise $
-    FP.combine (FP.takeDirectory curFile) relPath
-
-nixBuiltins :: FilePath -> NValue IO
-nixBuiltins curFile = Fix . NVSet . M.fromList $
-  [ ("import", Fix nixImport) ]
-  where
-    nixImport = NVFunction (Param "path") $ \case
-      Fix (NVSet m) | Just (Fix (NVLiteralPath file)) <- M.lookup "path" m -> do
-        let absPath = normaliseNixPath curFile file
-        expr <- parsePathFile absPath
-        evalExpr expr (nixBuiltins absPath)
-      nv -> die ("Invalid import argument: " ++ show nv)
-
-readPathFile :: FilePath -> IO [NixPath]
-readPathFile file = parsePathFile file >>= eval
-  where
-    eval expr = do
-      Fix val <- evalExpr expr (nixBuiltins file)
-      return $ toPaths val
-
-    toPaths (NVSet m) = map toPath (M.toList m)
-    toPaths _ = errorWithoutStackTrace "Invalid path file (attr set expected)"
-
-    toPath (k, Fix (NVStr s)) =
-      PrefixPath (T.unpack k) (P.parseTextOrFail parser s)
-      where parser = P.nixPathTarget (normaliseNixPath file)
-    toPath (k, Fix (NVLiteralPath p)) =
-      PrefixPath (T.unpack k) (BasicPath p')
-      where p' = normaliseNixPath file p
-    toPath (k, Fix (NVEnvPath p)) =
-      PrefixPath (T.unpack k) (PathRef p)
-    toPath (k, Fix nv) =
-      errorWithoutStackTrace $
-        "Invalid path element " ++ T.unpack k ++
-        ". Expected string, got " ++ show nv
