@@ -109,10 +109,18 @@ resolvePathRef paths p =
     (root:ps) = splitDirectories p
     targets = [ t | PrefixPath p' t <- paths, p' == root ]
 
+resolvePaths :: [NixPath] -> [NixPath]
+resolvePaths paths = map resolvePath paths
+  where
+    resolvePath (RootPath p) = RootPath (resolvePathTarget p)
+    resolvePath (PrefixPath k p) = PrefixPath k (resolvePathTarget p)
+    resolvePathTarget (PathRef ref) = BasicPath (resolvePathRef paths ref)
+    resolvePathTarget p = p
+
 generateNixPathsFile :: [NixPath] -> IO FilePath
 generateNixPathsFile paths = do
   CacheDirs { cdTmp = tmpDir } <- getCacheDirs
-  let contents = nixPathsToNixExpr paths
+  let contents = nixPathsToNixExpr (resolvePaths paths)
       fp = combine tmpDir (showHex (xxHash (BL.pack contents)) "") ++ ".nix"
   fileExist <- doesFileExist fp
   if fileExist
