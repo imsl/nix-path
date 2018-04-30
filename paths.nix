@@ -1,3 +1,3 @@
 {
-  nixpkgs = "https://github.com/NixOS/nixpkgs release-17.09";
+  nixpkgs = "https://github.com/NixOS/nixpkgs release-18.03";
 }

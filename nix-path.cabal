@@ -21,7 +21,7 @@ Library
     , bytestring
     , containers
     , data-fix >= 0.0.7
-    , hnix >= 0.3.4
+    , hnix >= 0.4.0
     , hweblib
     , filepath
     , text
